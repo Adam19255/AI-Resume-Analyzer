@@ -3,6 +3,8 @@ import re
 import json
 from app.services.recommender_service import generate_recommendations
 from app.core.config import config
+from app.services.skills_manager import load_skills, save_new_skills, extract_potential_skills
+
 
 # Load embedding model (cache)
 model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -22,7 +24,7 @@ def analyze_resume(resume_text: str, job_text: str):
     similarity = float(util.cos_sim(emb_resume, emb_job)[0][0])
 
     # === Skill coverage ===
-    skills = _load_skills()
+    skills = load_skills()
     job_skills = [kw for kw in skills if kw.lower() in job_text.lower()]
     found_skills = [kw for kw in job_skills if kw.lower() in resume_text.lower()]
     coverage = len(found_skills) / len(job_skills) if job_skills else 0
@@ -46,6 +48,12 @@ def analyze_resume(resume_text: str, job_text: str):
 
     recommendations = generate_recommendations(missing)
 
+    # === Dynamic skill learning ===
+    # Find new terms from resume and job description
+    potential_skills = extract_potential_skills(resume_text + " " + job_text)
+    save_new_skills(potential_skills)
+
+
     return {
         "score": round(final_score, 2),
         "missing_keywords": missing,
@@ -57,13 +65,6 @@ def analyze_resume(resume_text: str, job_text: str):
             "section_completeness": round(completeness, 3)
         }
     }
-
-def _load_skills():
-    try:
-        with open(config.SKILLS_FILE_PATH, "r", encoding="utf-8") as f:
-            return json.load(f).get("required", [])
-    except Exception as e:
-        raise RuntimeError(f"Failed to load skills taxonomy: {e}")
 
 def _keyword_density(text):
     tokens = re.findall(r"\b\w+\b", text.lower())
