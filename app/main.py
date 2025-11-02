@@ -1,12 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes_resume import router as resume_router
+from app.core.error_handlers import register_error_handlers
 
 app = FastAPI(
     title="AI Resume Analyzer",
     description="An AI-powered API that analyzes resumes vs job descriptions and returns improvement suggestions.",
     version="1.0.0",
 )
+
+register_error_handlers(app)
 
 # Allow cross-origin access (for future React / Streamlit frontends)
 app.add_middleware(
