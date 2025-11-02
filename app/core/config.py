@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 class Config:
     """
     Central configuration for scoring weights and parameters.

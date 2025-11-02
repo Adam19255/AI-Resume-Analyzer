@@ -1,76 +1,114 @@
+# app/services/analyzer_service.py
 from sentence_transformers import SentenceTransformer, util
-import re
-import json
-from app.services.recommender_service import generate_recommendations
 from app.core.config import config
-from app.services.skills_manager import load_skills, save_new_skills, extract_potential_skills
+import spacy
+import re
 
-
-# Load embedding model (cache)
+# === Load model for semantic similarity ===
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
+# === Lazy-load spaCy for skill extraction ===
+_nlp = None
+def _get_nlp():
+    global _nlp
+    if _nlp is None:
+        try:
+            _nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            raise RuntimeError(
+                "spaCy model not found. Run: python -m spacy download en_core_web_sm"
+            )
+    return _nlp
+
+
+# === Main Analysis Function ===
 def analyze_resume(resume_text: str, job_text: str):
-    # === Basic validation ===
+    """
+    Compare a resume with a job description and return:
+    - weighted score
+    - missing keywords
+    - improvement recommendations
+    - breakdown metrics
+    - optional LLM feedback (handled elsewhere)
+    """
+
+    # === 1. Validation ===
     if len(resume_text.split()) < config.MIN_WORDS_RESUME:
         raise ValueError("Resume text seems too short or unreadable.")
     if len(job_text.split()) < config.MIN_WORDS_JOBDESC:
         raise ValueError("Job description too short for analysis.")
-    
-    # === Semantic similarity ===
-    # Encodes resume and job description into dense vectors (tensors).
+
+    # === 2. Semantic Similarity ===
     emb_resume = model.encode(resume_text, convert_to_tensor=True)
     emb_job = model.encode(job_text, convert_to_tensor=True)
-    # Computes cosine similarity (−1 to 1; usually ~0.5–0.9 for related texts).
     similarity = float(util.cos_sim(emb_resume, emb_job)[0][0])
 
-    # === Skill coverage ===
-    skills = load_skills()
-    job_skills = [kw for kw in skills if kw.lower() in job_text.lower()]
-    found_skills = [kw for kw in job_skills if kw.lower() in resume_text.lower()]
+    # === 3. Skill Extraction (contextual, no persistence) ===
+    resume_skills = extract_skills(resume_text)
+    job_skills = extract_skills(job_text)
+
+    # === 4. Skill Coverage ===
+    found_skills = [kw for kw in job_skills if kw in resume_skills]
+    missing_skills = [kw for kw in job_skills if kw not in resume_skills]
     coverage = len(found_skills) / len(job_skills) if job_skills else 0
 
-    missing = [kw for kw in job_skills if kw not in found_skills]
-
-    # === Keyword density ===
+    # === 5. Keyword Density & Section Completeness ===
     density = _keyword_density(resume_text)
-
-    # === Section completeness ===
     completeness = _section_completeness(resume_text)
 
-    # === Weighted score ===
-    weights = config.WEIGHTS
+    # === 6. Weighted Final Score ===
+    w = config.WEIGHTS
     final_score = (
-        weights["semantic_similarity"] * similarity +
-        weights["skill_coverage"] * coverage +
-        weights["keyword_density"] * density +
-        weights["section_completeness"] * completeness
+        w["semantic_similarity"] * similarity +
+        w["skill_coverage"] * coverage +
+        w["keyword_density"] * density +
+        w["section_completeness"] * completeness
     ) * 100
 
-    recommendations = generate_recommendations(missing)
-
-    # === Dynamic skill learning ===
-    # Find new terms from resume and job description
-    potential_skills = extract_potential_skills(resume_text + " " + job_text)
-    save_new_skills(potential_skills)
-
-
+    # === 7. Return JSON-compatible dict ===
     return {
         "score": round(final_score, 2),
-        "missing_keywords": missing,
-        "recommendations": recommendations,
+        "missing_keywords": missing_skills,
         "metrics": {
             "similarity": round(similarity, 3),
             "skill_coverage": round(coverage, 3),
             "keyword_density": round(density, 3),
             "section_completeness": round(completeness, 3)
-        }
+        },
+        "ai_feedback": None
     }
 
+# === Skill Extraction ===
+def extract_skills(text, mode="spacy"):
+    """
+    Extracts skill-like terms using either spaCy (NER) or regex fallback.
+    """
+    if mode == "spacy":
+        nlp = _get_nlp()
+        doc = nlp(text)
+        candidates = []
+        for ent in doc.ents:
+            # These entity labels often include software, technologies, and organizations
+            if ent.label_ in ["ORG", "PRODUCT", "NORP", "WORK_OF_ART"]:
+                candidates.append(ent.text.lower())
+        clean = [c for c in candidates if 2 < len(c) < 30 and not re.search(r"\d", c)]
+        return sorted(set(clean))
+
+    else:
+        # regex fallback if spaCy unavailable
+        words = re.findall(r"\b[a-zA-Z0-9\+\#\.]{3,}\b", text)
+        words = [w.lower() for w in words if len(w) < 20]
+        return sorted(set(words))
+
+
+# === Keyword Density ===
 def _keyword_density(text):
     tokens = re.findall(r"\b\w+\b", text.lower())
     matches = [w for w in tokens if w in config.ACTION_VERBS]
     return len(matches) / len(tokens) if tokens else 0
 
+
+# === Section Completeness ===
 def _section_completeness(text):
     sections = ["experience", "education", "skills", "projects"]
     count = sum(1 for s in sections if s in text.lower())
