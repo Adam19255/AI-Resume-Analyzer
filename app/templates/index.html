@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AI Resume Analyzer</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script defer src="/static/script.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🧠 AI Resume Analyzer</h1>
+      <p class="subtitle">Compare your resume against a job posting using AI</p>
+
+      <div class="toggle-container">
+        <button type="button" id="toggle-llm" class="btn-toggle">LLM Feedback: ON</button>
+      </div>
+
+      <!-- Scoring Weights Configuration -->
+      <div class="weights-container">
+        <h3>⚖️ Scoring Weights</h3>
+
+        <div class="weight-item">
+          <label for="w-similarity"> Similarity: <span id="val-similarity" class="weight-val">0.4</span> </label>
+          <input type="range" id="w-similarity" min="0" max="1" step="0.05" value="0.4" />
+          <p class="desc">Measures how closely your resume matches the job description wording.</p>
+        </div>
+
+        <div class="weight-item">
+          <label for="w-skill"> Skill Coverage: <span id="val-skill" class="weight-val">0.3</span> </label>
+          <input type="range" id="w-skill" min="0" max="1" step="0.05" value="0.3" />
+          <p class="desc">Checks how many of the job-required skills appear in your resume.</p>
+        </div>
+
+        <div class="weight-item">
+          <label for="w-keyword"> Keyword Density: <span id="val-keyword" class="weight-val">0.2</span> </label>
+          <input type="range" id="w-keyword" min="0" max="1" step="0.05" value="0.2" />
+          <p class="desc">
+            Looks at how frequently and evenly key technical terms appear across your resume (developed, designed,
+            implemented, etc.).
+          </p>
+        </div>
+
+        <div class="weight-item">
+          <label for="w-section"> Section Completeness: <span id="val-section" class="weight-val">0.1</span> </label>
+          <input type="range" id="w-section" min="0" max="1" step="0.05" value="0.1" />
+          <p class="desc">Verifies if your resume includes all important sections (skills, education, etc.).</p>
+        </div>
+
+        <button type="button" id="save-weights" class="btn-primary small">💾 Save Weights</button>
+      </div>
+
+      <!-- Resume Input Forms -->
+      <form method="post" action="/analyze" onsubmit="startLoading()">
+        <label>Paste your Resume</label>
+        <textarea name="resume" placeholder="Paste your resume..." required></textarea>
+
+        <label>Paste Job Description</label>
+        <textarea name="job" placeholder="Paste the job description..." required></textarea>
+
+        <button type="submit" class="btn-primary">Analyze Text</button>
+      </form>
+
+      <div class="divider">or</div>
+
+      <form method="post" action="/upload" enctype="multipart/form-data" onsubmit="startLoading()">
+        <label>Upload your Resume (PDF/DOCX)</label>
+        <input type="file" name="resume_file" accept=".pdf,.docx" required />
+
+        <label>Paste Job Description</label>
+        <textarea name="job" placeholder="Paste the job description..." required></textarea>
+
+        <button type="submit" class="btn-secondary">Analyze File</button>
+      </form>
+
+      <!-- Loader Overlay -->
+      <div id="loader" class="loader-overlay">
+        <div class="loader"></div>
+        <p id="progress-text">Analyzing your resume... 0%</p>
+        <div class="progress-bar"><div id="progress-fill"></div></div>
+      </div>
+
+      {% if result %} {% if result.error %}
+      <div class="error-box">⚠️ {{ result.error }}</div>
+      {% else %}
+      <div class="results">
+        <h2>📊 Match Score: {{ "%.1f"|format(result.score) }}%</h2>
+
+        <div class="metrics">
+          <h3>Metrics</h3>
+          <div class="metric-item">
+            <span>Similarity</span>
+            <div class="metric-bar">
+              <div class="metric-bar-fill" data-value="{{ result.metrics.similarity }}"></div>
+            </div>
+          </div>
+          <div class="metric-item">
+            <span>Skill Coverage</span>
+            <div class="metric-bar">
+              <div class="metric-bar-fill" data-value="{{ result.metrics.skill_coverage }}"></div>
+            </div>
+          </div>
+          <div class="metric-item">
+            <span>Keyword Density</span>
+            <div class="metric-bar">
+              <div class="metric-bar-fill" data-value="{{ result.metrics.keyword_density }}"></div>
+            </div>
+          </div>
+          <div class="metric-item">
+            <span>Section Completeness</span>
+            <div class="metric-bar">
+              <div class="metric-bar-fill" data-value="{{ result.metrics.section_completeness }}"></div>
+            </div>
+          </div>
+        </div>
+
+        {% if result.missing_keywords %}
+        <div class="missing">
+          <h3>Missing Keywords</h3>
+          <p>{{ result.missing_keywords|join(', ') }}</p>
+        </div>
+        {% endif %} {% if result.ai_feedback %}
+        <div class="feedback">
+          <h3>💡 AI Feedback</h3>
+          <div class="ai-feedback-box">{{ result.ai_feedback | safe }}</div>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %} {% endif %}
+    </div>
+  </body>
+</html>

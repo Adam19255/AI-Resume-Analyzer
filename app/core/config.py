@@ -17,11 +17,8 @@ class Config:
         "section_completeness": 0.1,  # presence of Experience, Education, etc.
     }
 
-    # === Skill taxonomy file path ===
-    SKILLS_FILE_PATH = "app/assets/skills_taxonomy.json"
-
     # === Text processing parameters ===
-    MIN_WORDS_RESUME = 100  # sanity check for too-short resumes
+    MIN_WORDS_RESUME = 100
     MIN_WORDS_JOBDESC = 50
 
     # === Action verbs list (for density metric) ===
