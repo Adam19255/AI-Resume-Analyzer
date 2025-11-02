@@ -1,0 +1,14 @@
+{
+  "required": [
+    "python",
+    "machine learning",
+    "deep learning",
+    "pytorch",
+    "tensorflow",
+    "transformers",
+    "nlp",
+    "sql",
+    "azure",
+    "docker"
+  ]
+}
