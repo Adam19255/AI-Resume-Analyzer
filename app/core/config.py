@@ -7,6 +7,8 @@ class Config:
     These can later be loaded from .env or a database.
     """
 
+    USE_LLM_FEEDBACK = True  # ✅ toggle LLM feedback generation
+    
     # === Weighted scoring parameters ===
     WEIGHTS = {
         "semantic_similarity": 0.4,   # how close resume text is to job text

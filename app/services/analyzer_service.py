@@ -1,6 +1,7 @@
 # app/services/analyzer_service.py
 from sentence_transformers import SentenceTransformer, util
 from app.core.config import config
+from app.services.llm_service import generate_llm_feedback
 import spacy
 import re
 
@@ -65,6 +66,10 @@ def analyze_resume(resume_text: str, job_text: str):
         w["section_completeness"] * completeness
     ) * 100
 
+    llm_feedback = None
+    if config.USE_LLM_FEEDBACK:
+        llm_feedback = generate_llm_feedback(resume_text, job_text, missing_skills)
+
     # === 7. Return JSON-compatible dict ===
     return {
         "score": round(final_score, 2),
@@ -75,7 +80,7 @@ def analyze_resume(resume_text: str, job_text: str):
             "keyword_density": round(density, 3),
             "section_completeness": round(completeness, 3)
         },
-        "ai_feedback": None
+        "ai_feedback": llm_feedback  # may be None if no key
     }
 
 # === Skill Extraction ===

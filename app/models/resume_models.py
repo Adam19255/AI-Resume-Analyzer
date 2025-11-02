@@ -5,6 +5,5 @@ from typing import List, Dict, Optional
 class AnalysisResponse(BaseModel):
     score: float
     missing_keywords: List[str]
-    recommendations: List[str]
     metrics: Dict[str, float]
     ai_feedback: Optional[str] = None
